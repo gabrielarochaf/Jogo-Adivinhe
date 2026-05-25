@@ -4,32 +4,127 @@ import styles from "./app.module.css";
 import { Letter } from "./components/Letter";
 import { Input } from "./components/Input";
 import { Button } from "./components/Button";
-import { LettersUsed } from "./components/LettersUsed";
+import { LettersUsed, type LettersUsedProps } from "./components/LettersUsed";
+import { WORDS, type Challenge } from "./utils/words";
+import { useEffect, useState } from "react";
+
+const ATTEMPTS_MARGIN = 5;
 
 export default function App() {
+  const [score, setScore] = useState(0);
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [letter, setLetter] = useState("");
+  const [lettersUsed, setLettersUsed] = useState<LettersUsedProps[]>([]);
+
   function handleRestartGame() {
-    alert("Reiniciar o jogo");
+    const isConfirmed = window.confirm("Are you sure you want to restart??")
+
+    if(isConfirmed) {startGame()}
   }
+
+  function startGame() {
+    const index = Math.floor(Math.random() * WORDS.length);
+    const randomWord = WORDS[index];
+    setChallenge(randomWord);
+
+    setScore(0);
+    setLetter("");
+    setLettersUsed([]);
+  }
+
+  function handleConfirm() {
+    if (!challenge) return;
+    if (!letter.trim()) {
+      return alert("Type a letter");
+    }
+
+    const value = letter.toUpperCase();
+    const exists = lettersUsed.find(
+      (used) => used.value.toUpperCase() === value,
+    );
+
+    if (exists) {
+      setLetter("");
+      return alert("This letter has already been used." + value);
+    }
+
+    const hits = challenge.word
+      .toUpperCase()
+      .split("")
+      .filter((char) => char === value).length;
+
+    const correct = hits > 0;
+    const currentScore = score + hits;
+
+    setLettersUsed((prevState) => [...prevState, { value, correct }]);
+    setScore(currentScore);
+    setLetter("");
+  }
+
+  function endGame(message: string) {
+    alert(message);
+    startGame();
+  }
+
+  useEffect(() => {
+    startGame();
+  }, []);
+
+  useEffect(() => {
+    if (!challenge) return;
+
+    setTimeout(() => {
+      if (score === challenge.word.length) {
+        return endGame("Congradulations! You´ve figured it out! ");
+      }
+      const attemptLimit = challenge.word.length + ATTEMPTS_MARGIN;
+      if (lettersUsed.length === attemptLimit) {
+        return endGame("Sorry! You´ve used all the attempts");
+      }
+    });
+  }, [score, lettersUsed.length]);
+
+  if (!challenge) return;
+
   return (
     <div className={styles.container}>
       <main>
-        <Header current={5} max={10} onRestart={handleRestartGame} />
-        <Tip tip="Linguagem de programação dinâmica mais utilizadas" />
+        <Header
+          current={lettersUsed.length}
+          max={challenge?.word.length + ATTEMPTS_MARGIN}
+          onRestart={handleRestartGame}
+        />
+        <Tip tip={challenge.tip} />
         <div className={styles.word}>
-          <Letter value="R" />
-          <Letter value="e" />
-          <Letter value="a" />
-          <Letter value="c" />
-          <Letter value="t" />
+          {challenge.word.split("").map((letter, index) => {
+            const letterUsed = lettersUsed.find(
+              (used) => used.value.toUpperCase() === letter.toUpperCase(),
+            );
+            console.log(letterUsed);
+
+            return (
+              <Letter
+                key={index}
+                value={letterUsed?.value}
+                color={letterUsed?.correct ? "correct" : "default"}
+              />
+            );
+          })}
         </div>
 
         <h4>Palpite</h4>
         <div className={styles.guess}>
-          <Input autoFocus maxLength={1} placeholder="?" />
-          <Button title="Confirmar" />
+          <Input
+            autoFocus
+            maxLength={1}
+            placeholder="?"
+            value={letter}
+            onChange={(e) => setLetter(e.target.value)}
+          />
+          <Button title="Confirmar" onClick={handleConfirm} />
         </div>
 
-        <LettersUsed />
+        <LettersUsed data={lettersUsed} />
       </main>
     </div>
   );
